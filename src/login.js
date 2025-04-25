@@ -9,7 +9,11 @@ import {
   InputAdornment,
   CircularProgress,
   Alert,
-  IconButton
+  IconButton,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel
 } from "@mui/material";
 import {
   Email as EmailIcon,
@@ -31,36 +35,52 @@ const theme = createTheme({
   },
 });
 
+const API_BASE = "http://localhost:5000/api";
+
 const Login = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isSignup, setIsSignup] = useState(false);
+  const [role, setRole] = useState("student");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
+    const email = e.target.email.value;
+    const password = e.target.password.value;
+
     try {
-      const email = e.target.email.value;
-      const password = e.target.password.value;
+      const endpoint = isSignup ? "/auth/signup" : "/auth/login";
+      const response = await fetch(API_BASE + endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, role }),
+      });
+      const data = await response.json();
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (!response.ok) {
+        setError(data.message || "Error occurred");
+        setLoading(false);
+        return;
+      }
 
-      let role = "student";
-      if (email === "admin@example.com" && password === "12345") role = "admin";
-      else if (email === "teacher@example.com" && password === "12345") role = "teacher";
-      else setError("Invalid credentials");
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("userRole", data.user.role);
+      localStorage.setItem("userEmail", data.user.email);
 
-      if (!error) {
-        if (role === "admin") navigate("/admin");
-        else if (role === "teacher") navigate("/teacher");
-        else navigate("/student");
+      if (data.user.role === "admin") {
+        navigate("/admin");
+      } else if (data.user.role === "teacher") {
+        navigate("/teacher");
+      } else {
+        navigate("/student");
       }
     } catch (err) {
-      setError("Login failed. Please try again.");
+      setError("Network error");
     } finally {
       setLoading(false);
     }
@@ -88,7 +108,7 @@ const Login = () => {
               School Portal
             </Typography>
             <Typography variant="subtitle1" align="center" sx={{ mb: 4, color: 'text.secondary' }}>
-              Sign in to continue
+              {isSignup ? "Sign up to continue" : "Sign in to continue"}
             </Typography>
 
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -138,6 +158,27 @@ const Login = () => {
                 variant="outlined"
                 sx={{ mb: 3 }}
               />
+              {!isSignup && (
+                <FormControl fullWidth sx={{ mb: 3 }}>
+                  <InputLabel id="role-label">Role</InputLabel>
+                  <Select
+                    labelId="role-label"
+                    id="role"
+                    value={role}
+                    label="Role"
+                    onChange={(e) => setRole(e.target.value)}
+                  >
+                    <MenuItem value="student">Student</MenuItem>
+                    <MenuItem value="teacher">Teacher</MenuItem>
+                    <MenuItem value="admin">Admin</MenuItem>
+                  </Select>
+                </FormControl>
+              )}
+              {isSignup && (
+                <Typography variant="body2" sx={{ mb: 2 }}>
+                  Sign up is only available for authorized students and teachers.
+                </Typography>
+              )}
 
               <Button
                 type="submit"
@@ -156,10 +197,17 @@ const Login = () => {
                 {loading ? (
                   <CircularProgress size={24} color="inherit" />
                 ) : (
-                  'Sign In'
+                  isSignup ? 'Sign Up' : 'Sign In'
                 )}
               </Button>
             </Box>
+            <Button
+              onClick={() => setIsSignup(!isSignup)}
+              fullWidth
+              sx={{ mt: 2, textTransform: 'none' }}
+            >
+              {isSignup ? 'Have an account? Sign In' : 'No account? Sign Up'}
+            </Button>
           </Paper>
         </Container>
       </Box>
